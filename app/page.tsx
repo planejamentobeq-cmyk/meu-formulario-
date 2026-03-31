@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 type Item = {
   codigo: string
@@ -14,6 +14,29 @@ export default function Formulario() {
   const [operacao, setOperacao] = useState('')
   const [itens, setItens] = useState<Item[]>([])
   const [carregando, setCarregando] = useState(false)
+  const [dataInicio, setDataInicio] = useState('')
+  const [tempoDecorrido, setTempoDecorrido] = useState(0)
+  const intervaloRef = useRef<NodeJS.Timeout | null>(null)
+
+  const iniciarCronometro = () => {
+    setDataInicio(new Date().toLocaleString('pt-BR'))
+    setTempoDecorrido(0)
+    if (intervaloRef.current) clearInterval(intervaloRef.current)
+    intervaloRef.current = setInterval(() => {
+      setTempoDecorrido(prev => prev + 1)
+    }, 1000)
+  }
+
+  const pararCronometro = () => {
+    if (intervaloRef.current) clearInterval(intervaloRef.current)
+  }
+
+  const formatarTempo = (segundos: number) => {
+    const h = Math.floor(segundos / 3600).toString().padStart(2, '0')
+    const m = Math.floor((segundos % 3600) / 60).toString().padStart(2, '0')
+    const s = (segundos % 60).toString().padStart(2, '0')
+    return `${h}:${m}:${s}`
+  }
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -33,6 +56,7 @@ export default function Formulario() {
         }
       })
       setItens(parsed)
+      iniciarCronometro()
     }
     reader.readAsText(file, 'UTF-8')
   }
@@ -61,8 +85,14 @@ export default function Formulario() {
     }))
   }
 
-  const baixarCSV = (nomeResp: string, op: string, dados: Item[]) => {
+  const baixarCSV = (nomeResp: string, op: string, dados: Item[], inicio: string, fim: string, duracao: string) => {
     const rows = [
+      `Responsável:;${nomeResp}`,
+      `Operação:;${op}`,
+      `Início:;${inicio}`,
+      `Fim:;${fim}`,
+      `Duração:;${duracao}`,
+      '',
       'Código;Descrição;Qtd. Necessária;Qtd. Separada;Plaquetas',
       ...dados.map(item => `${item.codigo};${item.descricao};${item.qtd_necessaria};${item.qtd_separada};${item.plaquetas.join(', ')}`)
     ]
@@ -80,19 +110,24 @@ export default function Formulario() {
     if (!nome.trim()) return alert('Informe o nome do responsável')
     if (!operacao.trim()) return alert('Informe a operação')
     if (itens.length === 0) return alert('Carregue a planilha primeiro')
+    pararCronometro()
+    const dataFim = new Date().toLocaleString('pt-BR')
+    const duracao = formatarTempo(tempoDecorrido)
     setCarregando(true)
     const res = await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nome_responsavel: nome, operacao, itens }),
+      body: JSON.stringify({ nome_responsavel: nome, operacao, itens, data_inicio: dataInicio, data_fim: dataFim, duracao }),
     })
     setCarregando(false)
     if (res.ok) {
-      baixarCSV(nome, operacao, itens)
+      baixarCSV(nome, operacao, itens, dataInicio, dataFim, duracao)
       alert('Enviado com sucesso! A planilha foi baixada.')
       setNome('')
       setOperacao('')
       setItens([])
+      setDataInicio('')
+      setTempoDecorrido(0)
     } else {
       alert('Erro ao enviar. Tente novamente.')
     }
@@ -101,9 +136,17 @@ export default function Formulario() {
   return (
     <main className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-5xl mx-auto">
-        <div className="bg-white rounded-2xl shadow p-6 mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-1">Separação de Materiais</h1>
-          <p className="text-gray-500 text-sm">Carregue a planilha e preencha as quantidades separadas.</p>
+        <div className="bg-white rounded-2xl shadow p-6 mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800 mb-1">Separação de Materiais</h1>
+            <p className="text-gray-500 text-sm">Carregue a planilha e preencha as quantidades separadas.</p>
+          </div>
+          {dataInicio && (
+            <div className="text-right">
+              <p className="text-xs text-gray-500">Início: {dataInicio}</p>
+              <p className="text-2xl font-mono font-bold text-blue-600">{formatarTempo(tempoDecorrido)}</p>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl shadow p-6 mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -146,13 +189,7 @@ export default function Formulario() {
                       <div className="flex flex-col gap-2">
                         {item.plaquetas.map((plaqueta, pi) => (
                           <div key={pi} className="flex gap-1">
-                            <input
-                              type="text"
-                              value={plaqueta}
-                              onChange={e => atualizarPlaqueta(i, pi, e.target.value)}
-                              placeholder="Nº plaqueta"
-                              className="w-full border border-gray-300 rounded-lg px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-blue-400"
-                            />
+                            <input type="text" value={plaqueta} onChange={e => atualizarPlaqueta(i, pi, e.target.value)} placeholder="Nº plaqueta" className="w-full border border-gray-300 rounded-lg px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-blue-400" />
                             <button onClick={() => removerPlaqueta(i, pi)} className="text-red-400 hover:text-red-600 px-1 font-bold">✕</button>
                           </div>
                         ))}
