@@ -7,7 +7,6 @@ export default function Formulario() {
   const [nome, setNome] = useState('')
   const [operacao, setOperacao] = useState('')
   const [itens, setItens] = useState<Item[]>([])
-  const [enviado, setEnviado] = useState(false)
   const [carregando, setCarregando] = useState(false)
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,6 +34,21 @@ export default function Formulario() {
     setItens(prev => prev.map((item, i) => i === index ? { ...item, qtd_separada: valor } : item))
   }
 
+  const baixarCSV = (nomeResp: string, op: string, dados: Item[]) => {
+    const rows = [
+      'Código;Descrição;Qtd. Necessária;Qtd. Separada',
+      ...dados.map(item => `${item.codigo};${item.descricao};${item.qtd_necessaria};${item.qtd_separada}`)
+    ]
+    const csv = '\uFEFF' + rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `separacao_${op}_${nomeResp}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const enviar = async () => {
     if (!nome.trim()) return alert('Informe o nome do responsável')
     if (!operacao.trim()) return alert('Informe a operação')
@@ -46,22 +60,16 @@ export default function Formulario() {
       body: JSON.stringify({ nome_responsavel: nome, operacao, itens }),
     })
     setCarregando(false)
-    if (res.ok) setEnviado(true)
-    else alert('Erro ao enviar. Tente novamente.')
+    if (res.ok) {
+      baixarCSV(nome, operacao, itens)
+      alert('Enviado com sucesso! A planilha foi baixada.')
+      setNome('')
+      setOperacao('')
+      setItens([])
+    } else {
+      alert('Erro ao enviar. Tente novamente.')
+    }
   }
-
-  if (enviado) return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center p-8 bg-white rounded-2xl shadow">
-        <div className="text-5xl mb-4">✅</div>
-        <h2 className="text-2xl font-bold text-green-600">Enviado com sucesso!</h2>
-        <p className="text-gray-500 mt-2">Obrigado, {nome}!</p>
-        <button onClick={() => { setEnviado(false); setNome(''); setOperacao(''); setItens([]) }} className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg">
-          Novo envio
-        </button>
-      </div>
-    </main>
-  )
 
   return (
     <main className="min-h-screen bg-gray-50 py-10 px-4">
