@@ -10,22 +10,22 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const rows: string[] = [
-    'Data;Responsável;Item;Quantidade Necessária;Quantidade Disponível'
+    'Data;Responsável;Operação;Código;Descrição;Qtd. Necessária;Qtd. Separada'
   ]
 
   for (const resposta of data) {
     for (const item of resposta.itens) {
       rows.push(
-        `${new Date(resposta.criado_em).toLocaleString('pt-BR')};${resposta.nome_responsavel};${item.nome};${item.qtd_necessaria};${item.qtd_disponivel}`
+        `${new Date(resposta.criado_em).toLocaleString('pt-BR')};${resposta.nome_responsavel};${resposta.operacao};${item.codigo};${item.descricao};${item.qtd_necessaria};${item.qtd_separada}`
       )
     }
   }
 
-  const csv = rows.join('\n')
+  const csv = '\uFEFF' + rows.join('\n')
   return new NextResponse(csv, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': 'attachment; filename="respostas.csv"',
+      'Content-Disposition': 'attachment; filename="separacao.csv"',
     },
   })
 }
