@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   await resend.emails.send({
     from: 'Separação <onboarding@resend.dev>',
-    to: ['almoxarifadomatriz@beq.com.br', 'raissa.carvalho@beq.com.br'],
+    to: ['raissa.carvalho@beq.com.br'],
     subject: `Separação finalizada - ${operacao} - ${nome_responsavel}`,
     html: `
       <h2>Separação de Materiais Finalizada</h2>
