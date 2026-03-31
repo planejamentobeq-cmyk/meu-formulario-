@@ -1,7 +1,13 @@
 'use client'
 import { useState } from 'react'
 
-type Item = { codigo: string; descricao: string; qtd_necessaria: number; qtd_separada: string }
+type Item = {
+  codigo: string
+  descricao: string
+  qtd_necessaria: number
+  qtd_separada: string
+  plaquetas: string[]
+}
 
 export default function Formulario() {
   const [nome, setNome] = useState('')
@@ -22,7 +28,8 @@ export default function Formulario() {
           codigo: cols[0]?.trim() || '',
           descricao: cols[1]?.trim() || '',
           qtd_necessaria: Number(cols[2]?.trim()) || 0,
-          qtd_separada: ''
+          qtd_separada: '',
+          plaquetas: []
         }
       })
       setItens(parsed)
@@ -30,14 +37,34 @@ export default function Formulario() {
     reader.readAsText(file, 'UTF-8')
   }
 
-  const atualizar = (index: number, valor: string) => {
+  const atualizarQtd = (index: number, valor: string) => {
     setItens(prev => prev.map((item, i) => i === index ? { ...item, qtd_separada: valor } : item))
+  }
+
+  const adicionarPlaqueta = (index: number) => {
+    setItens(prev => prev.map((item, i) => i === index ? { ...item, plaquetas: [...item.plaquetas, ''] } : item))
+  }
+
+  const atualizarPlaqueta = (itemIndex: number, plaquetaIndex: number, valor: string) => {
+    setItens(prev => prev.map((item, i) => {
+      if (i !== itemIndex) return item
+      const novas = [...item.plaquetas]
+      novas[plaquetaIndex] = valor
+      return { ...item, plaquetas: novas }
+    }))
+  }
+
+  const removerPlaqueta = (itemIndex: number, plaquetaIndex: number) => {
+    setItens(prev => prev.map((item, i) => {
+      if (i !== itemIndex) return item
+      return { ...item, plaquetas: item.plaquetas.filter((_, pi) => pi !== plaquetaIndex) }
+    }))
   }
 
   const baixarCSV = (nomeResp: string, op: string, dados: Item[]) => {
     const rows = [
-      'Código;Descrição;Qtd. Necessária;Qtd. Separada',
-      ...dados.map(item => `${item.codigo};${item.descricao};${item.qtd_necessaria};${item.qtd_separada}`)
+      'Código;Descrição;Qtd. Necessária;Qtd. Separada;Plaquetas',
+      ...dados.map(item => `${item.codigo};${item.descricao};${item.qtd_necessaria};${item.qtd_separada};${item.plaquetas.join(', ')}`)
     ]
     const csv = '\uFEFF' + rows.join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -103,16 +130,36 @@ export default function Formulario() {
                   <th className="text-left px-4 py-3">Descrição</th>
                   <th className="text-center px-4 py-3">Qtd. Necessária</th>
                   <th className="text-center px-4 py-3">Qtd. Separada</th>
+                  <th className="text-center px-4 py-3">Plaquetas</th>
                 </tr>
               </thead>
               <tbody>
                 {itens.map((item, i) => (
                   <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-4 py-3 text-gray-700">{item.codigo}</td>
-                    <td className="px-4 py-3 text-gray-700">{item.descricao}</td>
-                    <td className="px-4 py-3 text-center text-gray-700">{item.qtd_necessaria}</td>
-                    <td className="px-4 py-3">
-                      <input type="number" min={0} value={item.qtd_separada} onChange={e => atualizar(i, e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                    <td className="px-4 py-3 text-gray-700 align-top">{item.codigo}</td>
+                    <td className="px-4 py-3 text-gray-700 align-top">{item.descricao}</td>
+                    <td className="px-4 py-3 text-center text-gray-700 align-top">{item.qtd_necessaria}</td>
+                    <td className="px-4 py-3 align-top">
+                      <input type="number" min={0} value={item.qtd_separada} onChange={e => atualizarQtd(i, e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <div className="flex flex-col gap-2">
+                        {item.plaquetas.map((plaqueta, pi) => (
+                          <div key={pi} className="flex gap-1">
+                            <input
+                              type="text"
+                              value={plaqueta}
+                              onChange={e => atualizarPlaqueta(i, pi, e.target.value)}
+                              placeholder="Nº plaqueta"
+                              className="w-full border border-gray-300 rounded-lg px-2 py-1 text-center focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            />
+                            <button onClick={() => removerPlaqueta(i, pi)} className="text-red-400 hover:text-red-600 px-1 font-bold">✕</button>
+                          </div>
+                        ))}
+                        <button onClick={() => adicionarPlaqueta(i)} className="text-xs text-blue-600 hover:text-blue-800 border border-blue-300 rounded-lg px-2 py-1 hover:bg-blue-50 transition">
+                          + Adicionar plaqueta
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
