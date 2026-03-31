@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Separação de Materiais",
-  description: "Formulário de separação de materiais",
+  description: "Formulário de separação de materiais - EPI EPC e Ferramentas",
 };
 
 export default function RootLayout({
