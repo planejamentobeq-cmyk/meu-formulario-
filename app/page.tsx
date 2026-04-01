@@ -7,7 +7,10 @@ type Item = {
   qtd_necessaria: number
   qtd_separada: string
   plaquetas: string[]
+  armazem: string
 }
+
+const STORAGE_KEY = 'separacao_dados'
 
 export default function Formulario() {
   const [nome, setNome] = useState('')
@@ -18,8 +21,32 @@ export default function Formulario() {
   const [tempoDecorrido, setTempoDecorrido] = useState(0)
   const intervaloRef = useRef<NodeJS.Timeout | null>(null)
 
+  useEffect(() => {
+    const salvo = localStorage.getItem(STORAGE_KEY)
+    if (salvo) {
+      const dados = JSON.parse(salvo)
+      setNome(dados.nome || '')
+      setOperacao(dados.operacao || '')
+      setItens(dados.itens || [])
+      setDataInicio(dados.dataInicio || '')
+      setTempoDecorrido(dados.tempoDecorrido || 0)
+      if (dados.dataInicio) {
+        intervaloRef.current = setInterval(() => {
+          setTempoDecorrido(prev => prev + 1)
+        }, 1000)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (itens.length > 0 || nome || operacao) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ nome, operacao, itens, dataInicio, tempoDecorrido }))
+    }
+  }, [nome, operacao, itens, dataInicio, tempoDecorrido])
+
   const iniciarCronometro = () => {
-    setDataInicio(new Date().toLocaleString('pt-BR'))
+    const inicio = new Date().toLocaleString('pt-BR')
+    setDataInicio(inicio)
     setTempoDecorrido(0)
     if (intervaloRef.current) clearInterval(intervaloRef.current)
     intervaloRef.current = setInterval(() => {
@@ -52,7 +79,8 @@ export default function Formulario() {
           descricao: cols[1]?.trim() || '',
           qtd_necessaria: Number(cols[2]?.trim()) || 0,
           qtd_separada: '',
-          plaquetas: []
+          plaquetas: [],
+          armazem: ''
         }
       })
       setItens(parsed)
@@ -63,6 +91,10 @@ export default function Formulario() {
 
   const atualizarQtd = (index: number, valor: string) => {
     setItens(prev => prev.map((item, i) => i === index ? { ...item, qtd_separada: valor } : item))
+  }
+
+  const atualizarArmazem = (index: number, valor: string) => {
+    setItens(prev => prev.map((item, i) => i === index ? { ...item, armazem: valor } : item))
   }
 
   const adicionarPlaqueta = (index: number) => {
@@ -93,8 +125,8 @@ export default function Formulario() {
       `Fim:;${fim}`,
       `Duração:;${duracao}`,
       '',
-      'Código;Descrição;Qtd. Necessária;Qtd. Separada;Plaquetas',
-      ...dados.map(item => `${item.codigo};${item.descricao};${item.qtd_necessaria};${item.qtd_separada};${item.plaquetas.join(', ')}`)
+      'Código;Descrição;Qtd. Necessária;Qtd. Separada;Armazém;Plaquetas',
+      ...dados.map(item => `${item.codigo};${item.descricao};${item.qtd_necessaria};${item.qtd_separada};${item.armazem};${item.plaquetas.join(', ')}`)
     ]
     const csv = '\uFEFF' + rows.join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -104,6 +136,16 @@ export default function Formulario() {
     a.download = `separacao_${op}_${nomeResp}.csv`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const limpar = () => {
+    localStorage.removeItem(STORAGE_KEY)
+    setNome('')
+    setOperacao('')
+    setItens([])
+    setDataInicio('')
+    setTempoDecorrido(0)
+    pararCronometro()
   }
 
   const enviar = async () => {
@@ -123,11 +165,7 @@ export default function Formulario() {
     if (res.ok) {
       baixarCSV(nome, operacao, itens, dataInicio, dataFim, duracao)
       alert('Enviado com sucesso! A planilha foi baixada.')
-      setNome('')
-      setOperacao('')
-      setItens([])
-      setDataInicio('')
-      setTempoDecorrido(0)
+      limpar()
     } else {
       alert('Erro ao enviar. Tente novamente.')
     }
@@ -135,18 +173,25 @@ export default function Formulario() {
 
   return (
     <main className="min-h-screen bg-gray-50 py-10 px-4">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-2xl shadow p-6 mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-800 mb-1">Separação de Materiais</h1>
             <p className="text-gray-500 text-sm">Carregue a planilha e preencha as quantidades separadas.</p>
           </div>
-          {dataInicio && (
-            <div className="text-right">
-              <p className="text-xs text-gray-500">Início: {dataInicio}</p>
-              <p className="text-2xl font-mono font-bold text-blue-600">{formatarTempo(tempoDecorrido)}</p>
-            </div>
-          )}
+          <div className="flex items-center gap-4">
+            {dataInicio && (
+              <div className="text-right">
+                <p className="text-xs text-gray-500">Início: {dataInicio}</p>
+                <p className="text-2xl font-mono font-bold text-blue-600">{formatarTempo(tempoDecorrido)}</p>
+              </div>
+            )}
+            {itens.length > 0 && (
+              <button onClick={limpar} className="text-sm text-red-500 hover:text-red-700 border border-red-300 rounded-lg px-3 py-1 hover:bg-red-50 transition">
+                Limpar tudo
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="bg-white rounded-2xl shadow p-6 mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -173,6 +218,7 @@ export default function Formulario() {
                   <th className="text-left px-4 py-3">Descrição</th>
                   <th className="text-center px-4 py-3">Qtd. Necessária</th>
                   <th className="text-center px-4 py-3">Qtd. Separada</th>
+                  <th className="text-center px-4 py-3">Armazém</th>
                   <th className="text-center px-4 py-3">Plaquetas</th>
                 </tr>
               </thead>
@@ -184,6 +230,9 @@ export default function Formulario() {
                     <td className="px-4 py-3 text-center text-gray-700 align-top">{item.qtd_necessaria}</td>
                     <td className="px-4 py-3 align-top">
                       <input type="number" min={0} value={item.qtd_separada} onChange={e => atualizarQtd(i, e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <input type="text" value={item.armazem} onChange={e => atualizarArmazem(i, e.target.value)} placeholder="Armazém" className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-blue-400" />
                     </td>
                     <td className="px-4 py-3 align-top">
                       <div className="flex flex-col gap-2">
