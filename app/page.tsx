@@ -8,6 +8,8 @@ type Item = {
   qtd_separada: string
   plaquetas: string[]
   armazem: string
+  foto_url: string
+  foto_loading: boolean
 }
 
 const STORAGE_KEY = 'separacao_dados'
@@ -27,7 +29,7 @@ export default function Formulario() {
       const dados = JSON.parse(salvo)
       setNome(dados.nome || '')
       setOperacao(dados.operacao || '')
-      setItens(dados.itens || [])
+      setItens((dados.itens || []).map((item: Item) => ({ ...item, foto_loading: false })))
       setDataInicio(dados.dataInicio || '')
       setTempoDecorrido(dados.tempoDecorrido || 0)
       if (dados.dataInicio) {
@@ -80,13 +82,26 @@ export default function Formulario() {
           qtd_necessaria: Number(cols[2]?.trim()) || 0,
           qtd_separada: '',
           plaquetas: [],
-          armazem: ''
+          armazem: '',
+          foto_url: '',
+          foto_loading: false
         }
       })
       setItens(parsed)
       iniciarCronometro()
     }
     reader.readAsText(file, 'UTF-8')
+  }
+
+  const handleFoto = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setItens(prev => prev.map((item, i) => i === index ? { ...item, foto_loading: true } : item))
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await fetch('/api/upload', { method: 'POST', body: formData })
+    const data = await res.json()
+    setItens(prev => prev.map((item, i) => i === index ? { ...item, foto_url: data.url, foto_loading: false } : item))
   }
 
   const atualizarQtd = (index: number, valor: string) => {
@@ -125,8 +140,8 @@ export default function Formulario() {
       `Fim:;${fim}`,
       `Duração:;${duracao}`,
       '',
-      'Código;Descrição;Qtd. Necessária;Qtd. Separada;Armazém;Plaquetas',
-      ...dados.map(item => `${item.codigo};${item.descricao};${item.qtd_necessaria};${item.qtd_separada};${item.armazem};${item.plaquetas.join(', ')}`)
+      'Código;Descrição;Qtd. Necessária;Qtd. Separada;Armazém;Plaquetas;Foto',
+      ...dados.map(item => `${item.codigo};${item.descricao};${item.qtd_necessaria};${item.qtd_separada};${item.armazem};${item.plaquetas.join(', ')};${item.foto_url}`)
     ]
     const csv = '\uFEFF' + rows.join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -173,7 +188,7 @@ export default function Formulario() {
 
   return (
     <main className="min-h-screen bg-gray-50 py-10 px-4">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-2xl shadow p-6 mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-800 mb-1">Separação de Materiais</h1>
@@ -220,6 +235,7 @@ export default function Formulario() {
                   <th className="text-center px-4 py-3">Qtd. Separada</th>
                   <th className="text-center px-4 py-3">Armazém</th>
                   <th className="text-center px-4 py-3">Plaquetas</th>
+                  <th className="text-center px-4 py-3">Foto</th>
                 </tr>
               </thead>
               <tbody>
@@ -246,6 +262,18 @@ export default function Formulario() {
                           + Adicionar plaqueta
                         </button>
                       </div>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {item.foto_loading ? (
+                        <p className="text-xs text-gray-400 text-center">Enviando...</p>
+                      ) : item.foto_url ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <img src={item.foto_url} alt="foto" className="w-16 h-16 object-cover rounded-lg border" />
+                          <a href={item.foto_url} target="_blank" className="text-xs text-blue-600 hover:underline">Ver foto</a>
+                        </div>
+                      ) : (
+                        <input type="file" accept="image/*" onChange={e => handleFoto(i, e)} className="text-xs w-full" />
+                      )}
                     </td>
                   </tr>
                 ))}
